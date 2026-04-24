@@ -1,0 +1,741 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Kanban — Lopes de Lima Advogados</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f0efe9;color:#1a1a18;min-height:100vh}
+input,select,textarea,button{font-family:inherit}
+::-webkit-scrollbar{width:5px;height:6px}::-webkit-scrollbar-thumb{background:#ccc;border-radius:3px}
+
+.hd{background:#0C447C;padding:12px 22px;display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;z-index:20;box-shadow:0 2px 12px rgba(0,0,0,.25)}
+.hd-title{color:#fff;font-size:16px;font-weight:700}.hd-sub{color:rgba(255,255,255,.55);font-size:11px;margin-top:1px}
+.hd-right{display:flex;align-items:center;gap:10px}
+.sync-pill{display:flex;align-items:center;gap:5px;padding:4px 10px;border-radius:20px;font-size:11px;font-weight:600;transition:all .3s}
+.sync-idle{background:rgba(255,255,255,.12);color:rgba(255,255,255,.7)}
+.sync-saving{background:rgba(251,191,36,.25);color:#FCD34D}
+.sync-ok{background:rgba(74,222,128,.2);color:#4ADE80}
+.sync-err{background:rgba(248,113,113,.2);color:#F87171}
+.sync-loading{background:rgba(147,197,253,.2);color:#93C5FD}
+.dot{width:7px;height:7px;border-radius:50%;background:currentColor;flex-shrink:0}
+.dot-pulse{animation:pulse 1.2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+.btn-cfg{padding:5px 11px;background:rgba(255,255,255,.15);color:#fff;border:1px solid rgba(255,255,255,.3);border-radius:6px;font-size:11px;cursor:pointer;font-weight:600}
+.btn-cfg:hover{background:rgba(255,255,255,.28)}
+
+.tb{background:#fff;padding:10px 22px;display:flex;flex-wrap:wrap;gap:9px;align-items:center;border-bottom:1px solid #e2e0d8}
+.srch{flex:1;min-width:180px;padding:8px 11px;border:1px solid #ccc;border-radius:8px;font-size:13px;outline:none;background:#f9f8f5}
+.srch:focus{border-color:#185FA5;background:#fff}
+.sel{padding:8px 10px;border:1px solid #ccc;border-radius:8px;font-size:13px;background:#f9f8f5;color:#333;outline:none}
+.st{background:#fff;padding:7px 22px;display:flex;flex-wrap:wrap;gap:7px;border-bottom:1px solid #e2e0d8}
+.sp{background:#f5f4f0;border:1px solid #e2e0d8;border-radius:7px;padding:4px 12px;font-size:12px;white-space:nowrap}
+
+.board{padding:16px 22px 40px;display:flex;gap:13px;overflow-x:auto;min-height:calc(100vh - 190px);align-items:flex-start}
+.board::-webkit-scrollbar{height:7px}.board::-webkit-scrollbar-thumb{background:#b5b3ab;border-radius:4px}
+.col{min-width:278px;max-width:278px;display:flex;flex-direction:column;border-radius:11px;overflow:hidden;box-shadow:0 2px 10px rgba(0,0,0,.09);border:1px solid rgba(0,0,0,.09)}
+.col-head{padding:10px 13px;display:flex;justify-content:space-between;align-items:center}
+.col-label{color:#fff;font-size:12px;font-weight:700}
+.col-cnt{background:rgba(255,255,255,.26);border-radius:20px;padding:1px 9px;font-size:11px;color:#fff;font-weight:700}
+.col-body{flex:1;padding:7px;min-height:280px;transition:background .1s}
+.card{background:#fff;border:1px solid #e5e3da;border-radius:9px;padding:9px 10px;margin-bottom:7px;cursor:grab;transition:box-shadow .1s,border-color .12s}
+.card:hover{border-color:#aaa;box-shadow:0 3px 14px rgba(0,0,0,.1)}.card:active{cursor:grabbing;opacity:.78}
+.card-header{display:flex;justify-content:space-between;align-items:flex-start;gap:5px;margin-bottom:5px}
+.card-title{font-size:13px;font-weight:700;color:#1a1a18;flex:1;line-height:1.33}
+.pri-alta{display:inline-flex;padding:2px 9px;border-radius:20px;font-size:10px;font-weight:700;flex-shrink:0;background:#FEECEC;color:#C0392B;border:1px solid #F5B7B1}
+.pri-media{display:inline-flex;padding:2px 9px;border-radius:20px;font-size:10px;font-weight:700;flex-shrink:0;background:#FEF0E0;color:#D35400;border:1px solid #F8C471}
+.pri-baixa{display:inline-flex;padding:2px 9px;border-radius:20px;font-size:10px;font-weight:700;flex-shrink:0;background:#EAFAF1;color:#1E8449;border:1px solid #A9DFBF}
+.card-meta{display:flex;flex-wrap:wrap;gap:4px;margin-bottom:5px}
+.tag{font-size:10px;padding:2px 7px;border-radius:4px;background:#f0efe8;color:#555;border:1px solid #e2e0d8;white-space:nowrap}
+.tag-proc{font-family:monospace}.tag-inst{background:#EBF5FB;color:#1A5276;border-color:#AED6F1}
+.tag-resp{background:#F4ECF7;color:#6C3483;border-color:#D7BDE2}.tag-tipo{background:#E8F8F5;color:#117A65;border-color:#A2D9CE}
+.card-desc{font-size:11px;color:#888;margin-bottom:5px;line-height:1.44}
+.card-dates{display:flex;flex-direction:column;gap:2px;margin-bottom:4px}
+.date-row{font-size:11px;font-weight:600;display:flex;align-items:center;gap:4px;flex-wrap:wrap}
+.vbadge{background:#FEECEC;color:#C0392B;font-size:9px;padding:1px 5px;border-radius:3px;font-weight:700}
+.ubadge{background:#FEF0E0;color:#D35400;font-size:9px;padding:1px 5px;border-radius:3px;font-weight:700}
+.card-foot{display:flex;justify-content:space-between;align-items:center;margin-top:7px;gap:5px}
+.mv-sel{font-size:11px;padding:3px 6px;border:1px solid #d5d3cc;border-radius:5px;color:#666;background:#f9f8f5;cursor:pointer;flex:1;outline:none}
+.ic-btn{background:none;border:1px solid #d5d3cc;border-radius:5px;padding:3px 9px;font-size:11px;cursor:pointer;color:#555}
+.ic-btn:hover{background:#f5f4f0}.ic-del{border-color:#f0c0c0;color:#8B1A1A}.ic-del:hover{background:#fff0f0}
+.add-btn{width:100%;background:none;border:1px dashed #c5c3bb;border-radius:8px;padding:8px;font-size:12px;cursor:pointer;color:#999;margin-top:2px;transition:all .12s}
+.add-btn:hover{background:#eae8e0;color:#444;border-color:#999}
+
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,.52);display:flex;justify-content:center;align-items:flex-start;padding:48px 14px 20px;z-index:100;overflow-y:auto}
+.modal{background:#fff;border-radius:13px;border:1px solid #ddd;padding:22px;width:100%;max-width:560px;box-shadow:0 10px 50px rgba(0,0,0,.22)}
+.modal-title{font-size:15px;font-weight:700;margin-bottom:2px}.modal-sub{font-size:11px;color:#888;margin-bottom:12px}
+.lbl{font-size:11px;color:#555;font-weight:600;display:block;margin:10px 0 3px;text-transform:uppercase;letter-spacing:.4px}
+.inp{width:100%;padding:8px 10px;border:1px solid #ccc;border-radius:7px;font-size:13px;color:#1a1a18;background:#fff;outline:none}
+.inp:focus{border-color:#185FA5;box-shadow:0 0 0 3px rgba(24,95,165,.1)}.ta{resize:vertical;min-height:60px}
+.frow{display:flex;gap:10px;flex-wrap:wrap}.frow .fw{flex:1;min-width:130px}
+.sep{border:none;border-top:1px solid #eee;margin:14px 0 2px}
+.slbl{font-size:10px;font-weight:700;color:#aaa;text-transform:uppercase;letter-spacing:.8px;margin-bottom:6px}
+.modal-foot{display:flex;justify-content:flex-end;gap:8px;margin-top:18px}
+.btn{padding:8px 15px;border:none;border-radius:8px;font-size:12px;cursor:pointer;font-weight:700;white-space:nowrap;transition:filter .12s}
+.btn:hover{filter:brightness(.88)}.btn:disabled{opacity:.5;cursor:not-allowed}
+.btn-save{background:#185FA5;color:#fff}.btn-cancel{background:#f0efe8;color:#555;border:1px solid #d5d3cc}
+.btn-cancel:hover{filter:none;background:#e5e3db}.btn-danger{background:#A32D2D;color:#fff}
+.btn-test{background:#f0efe8;color:#444;border:1px solid #d5d3cc}
+.msg{font-size:12px;padding:5px 11px;border-radius:6px;font-weight:500}
+.msg-ok{background:#EAF3DE;color:#27500A}.msg-err{background:#FCEBEB;color:#791F1F}.msg-info{background:#E6F1FB;color:#0C447C}
+.setup-box{background:#FFFDE7;border:1px solid #F9D74B;border-radius:9px;padding:14px;font-size:12px;line-height:1.85;color:#444}
+.step{display:flex;gap:10px;align-items:flex-start;margin-bottom:9px}
+.step-n{background:#0C447C;color:#fff;border-radius:50%;width:22px;height:22px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0;margin-top:1px}
+.step-t{flex:1;font-size:12px;line-height:1.65;color:#444}
+.code-block{background:#1e1e1e;color:#d4d4d4;border-radius:8px;padding:14px;font-family:monospace;font-size:11px;line-height:1.7;overflow-x:auto;margin:10px 0;white-space:pre;position:relative}
+.copy-btn{position:absolute;top:8px;right:8px;background:#444;color:#fff;border:none;border-radius:4px;padding:3px 9px;font-size:11px;cursor:pointer}
+.copy-btn:hover{background:#666}
+.chip{display:inline-block;background:#e8f0fe;color:#1a73e8;border:1px solid #aecbfa;border-radius:4px;padding:1px 7px;font-size:11px;font-weight:600;font-family:monospace}
+.tab-bar{display:flex;gap:0;margin-bottom:14px;border-bottom:1px solid #eee}
+.tab-btn{padding:7px 16px;border:none;background:none;cursor:pointer;font-size:12px;font-weight:700;border-bottom:2px solid transparent;color:#888}
+.tab-btn.active{border-bottom-color:#185FA5;color:#185FA5}
+.test-result{margin-top:10px;padding:10px;border-radius:8px;font-size:12px;line-height:1.6;font-family:monospace;white-space:pre-wrap}
+.test-ok{background:#EAF3DE;color:#27500A;border:1px solid #A9DFBF}
+.test-err{background:#FCEBEB;color:#791F1F;border:1px solid #F5B7B1}
+.test-info{background:#E6F1FB;color:#0C447C;border:1px solid #AED6F1}
+.collab-banner{background:linear-gradient(90deg,#0C447C,#185FA5);color:#fff;padding:8px 22px;font-size:11px;display:flex;align-items:center;gap:8px;border-bottom:1px solid #0a3666}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const {useState,useEffect,useRef,useMemo,useCallback}=React;
+
+const COLS=[
+  {id:'atividades',    label:'Atividades',                   color:'#185FA5',light:'#D4E8F7'},
+  {id:'propostas',     label:'Propostas a Fazer',            color:'#6B21A8',light:'#EDE9FE'},
+  {id:'reunioes',      label:'Reuniões',                     color:'#0369A1',light:'#E0F2FE'},
+  {id:'audiencias',    label:'Audiências / Julgamentos',     color:'#B45309',light:'#FEF3C7'},
+  {id:'pendencias',    label:'Pendências',                    color:'#822250',light:'#F5D6E8'},
+  {id:'prazo',         label:'Prazo / Urgente',              color:'#A32D2D',light:'#FAD5D5'},
+  {id:'aguardando',    label:'Aguardando Retorno do Cliente',color:'#4A42A8',light:'#E4E2F8'},
+  {id:'em_analise',    label:'Em Análise',                   color:'#0D6B52',light:'#C8EEE4'},
+  {id:'concluido',     label:'Concluído',                    color:'#306010',light:'#D8EDBC'},
+];
+const PRI=[{v:'alta',lbl:'Alta',cls:'pri-alta'},{v:'media',lbl:'Média',cls:'pri-media'},{v:'baixa',lbl:'Baixa',cls:'pri-baixa'}];
+const INST=['','1ª Instância','2ª Instância','STJ','STF','TST','TCU','TCE/DF','ANS','CADE','TRF','TRT','Extrajudicial','Administrativo','Outro'];
+const TIPOS=['','Apelação','Agravo de Instrumento','Agravo Regimental','Agravo Interno','Embargos de Declaração','Recurso Especial','Recurso Extraordinário','Mandado de Segurança','Impugnação ao Cumprimento','Embargos à Execução','Ação Rescisória','Reclamação','Impugnação ao Edital','Defesa Prévia','Contestação','Petição Inicial','Outro'];
+const RESPS=['','Bruno Lima (OAB/DF)','Estagiário(a)','Outro'];
+const mk=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,5);
+const ts=()=>new Date().toISOString();
+const KEY='kll-v7',SCRKEY='kll-scripturl';
+const BLANK={title:'',client:'',processo:'',instancia:'',responsavel:'',tipoRecurso:'',description:'',deadline:'',conclusaoDeadline:'',fatalDeadline:'',waitDeadline:'',priority:'media'};
+const tod=()=>new Date().toISOString().slice(0,10);
+const in3=()=>new Date(Date.now()+3*864e5).toISOString().slice(0,10);
+const POLL_INTERVAL=30000; // 30 segundos
+const SAVE_DEBOUNCE=3000;  // 3 segundos após última alteração
+
+/* ── SEED ── */
+function seed(){
+  const i=mk;
+  return{
+    atividades:[
+      {id:i(),title:'Preparar pauta semanal',client:'Escritório',processo:'',instancia:'',responsavel:'Bruno Lima (OAB/DF)',tipoRecurso:'',description:'Organizar agenda da semana: audiências, prazos processuais e reuniões.',deadline:'',conclusaoDeadline:'',fatalDeadline:'',waitDeadline:'',priority:'media',createdAt:ts()},
+      {id:i(),title:'Atualizar clientes sobre andamento processual',client:'Geral',processo:'',instancia:'',responsavel:'Bruno Lima (OAB/DF)',tipoRecurso:'',description:'Enviar comunicado de atualização para todos os clientes com processos ativos.',deadline:'',conclusaoDeadline:'',fatalDeadline:'',waitDeadline:'',priority:'baixa',createdAt:ts()},
+    ],
+    propostas:[
+      {id:i(),title:'Embargos à Execução – Posto Chácara',client:'Posto Chácara',processo:'TJDFT',instancia:'2ª Instância',responsavel:'Bruno Lima (OAB/DF)',tipoRecurso:'Embargos à Execução',description:'Oposição de embargos em fase de cumprimento de sentença perante o TJDFT.',deadline:'',conclusaoDeadline:'',fatalDeadline:'',waitDeadline:'',priority:'alta',createdAt:ts()},
+      {id:i(),title:'Ação de Cobrança – faturas de hemodiálise (R$ 760k)',client:'Nefrostar Brasília',processo:'',instancia:'1ª Instância',responsavel:'Bruno Lima (OAB/DF)',tipoRecurso:'Petição Inicial',description:'Petição inicial de cobrança contra ex-paciente inadimplente. Total: R$ 760.000,00.',deadline:'',conclusaoDeadline:'',fatalDeadline:'',waitDeadline:'',priority:'alta',createdAt:ts()},
+      {id:i(),title:'NDA – Transação Mineral Zabuyelita',client:'Gramazini / UN-SCM',processo:'',instancia:'Extrajudicial',responsavel:'Bruno Lima (OAB/DF)',tipoRecurso:'',description:'Acordo de confidencialidade em 12 cláusulas para 5 partes internacionais.',deadline:'',conclusaoDeadline:'',fatalDeadline:'',waitDeadline:'',priority:'media',createdAt:ts()},
+    ],
+    reunioes:[
+      {id:i(),title:'Reunião de alinhamento – Nefrostar Brasília',client:'Nefrostar Brasília',processo:'',instancia:'',responsavel:'Bruno Lima (OAB/DF)',tipoRecurso:'',description:'Discussão sobre estratégia processual e próximos passos.',deadline:'',conclusaoDeadline:'',fatalDeadline:'',waitDeadline:'',priority:'media',createdAt:ts()},
+    ],
+    audiencias:[
+      {id:i(),title:'Audiência de instrução – Posto Chácara',client:'Posto Chácara',processo:'TJDFT',instancia:'2ª Instância',responsavel:'Bruno Lima (OAB/DF)',tipoRecurso:'Embargos à Execução',description:'Audiência de instrução e julgamento perante o TJDFT.',deadline:'',conclusaoDeadline:'',fatalDeadline:'',waitDeadline:'',priority:'alta',createdAt:ts()},
+    ],
+    pendencias:[
+      {id:i(),title:'Protocolo de Recurso – Juliana Martins',client:'Juliana Martins',processo:'TJDFT',instancia:'2ª Instância',responsavel:'Bruno Lima (OAB/DF)',tipoRecurso:'Apelação',description:'Recurso perante o TJDFT sobre recusa de cobertura de hemodiafiltração pelo plano de saúde.',deadline:'',conclusaoDeadline:'',fatalDeadline:'',waitDeadline:'',priority:'alta',createdAt:ts()},
+      {id:i(),title:'Resposta à Petição – Medida Protetiva (Daniel)',client:'Daniel',processo:'',instancia:'1ª Instância',responsavel:'Bruno Lima (OAB/DF)',tipoRecurso:'Contestação',description:'Elaborar resposta à petição nos autos da medida protetiva.',deadline:'',conclusaoDeadline:'',fatalDeadline:'',waitDeadline:'',priority:'media',createdAt:ts()},
+      {id:i(),title:'Revisar Contrato nº 41/2025 – ICMBio',client:'Star Locação de Serviços Gerais',processo:'02070.006225/2026-19',instancia:'Administrativo',responsavel:'Bruno Lima (OAB/DF)',tipoRecurso:'Defesa Prévia',description:'Revisão contratual pós-processo administrativo.',deadline:'',conclusaoDeadline:'',fatalDeadline:'',waitDeadline:'',priority:'media',createdAt:ts()},
+    ],
+    prazo:[
+      {id:i(),title:'Impugnação ao Edital – Decode Soluções vs. Serra Negra/SP',client:'Decode Soluções',processo:'',instancia:'Administrativo',responsavel:'Bruno Lima (OAB/DF)',tipoRecurso:'Impugnação ao Edital',description:'Impugnação ao edital do Município de Serra Negra. Abertura: 29/04/2026.',deadline:'2026-04-27',conclusaoDeadline:'2026-04-26',fatalDeadline:'2026-04-28',waitDeadline:'',priority:'alta',createdAt:ts()},
+    ],
+    aguardando:[
+      {id:i(),title:'Decisão Administrativa – ICMBio (Defesa Prévia)',client:'Star Locação de Serviços Gerais',processo:'02070.006225/2026-19',instancia:'Administrativo',responsavel:'Bruno Lima (OAB/DF)',tipoRecurso:'Defesa Prévia',description:'Defesa prévia protocolada no processo nº 02070.006225/2026-19.',deadline:'',conclusaoDeadline:'',fatalDeadline:'',waitDeadline:'2026-05-15',priority:'alta',createdAt:ts()},
+      {id:i(),title:'Resposta da Administração – Impugnação (Star Locação)',client:'Star Locação de Serviços Gerais',processo:'',instancia:'Administrativo',responsavel:'Bruno Lima (OAB/DF)',tipoRecurso:'Impugnação ao Edital',description:'Impugnação ao edital em Brasília. Aguardando pronunciamento do órgão.',deadline:'',conclusaoDeadline:'',fatalDeadline:'',waitDeadline:'2026-05-10',priority:'media',createdAt:ts()},
+      {id:i(),title:'Documentação – Inventário Yeh Mao Sen',client:'Espólio Yeh Mao Sen',processo:'',instancia:'Extrajudicial',responsavel:'Bruno Lima (OAB/DF)',tipoRecurso:'',description:'Inventário extrajudicial. Partilha de cotas, veículos e aplicações.',deadline:'',conclusaoDeadline:'',fatalDeadline:'',waitDeadline:'2026-05-20',priority:'media',createdAt:ts()},
+    ],
+    em_analise:[
+      {id:i(),title:'Portabilidade de plano de saúde – Regras ANS',client:'Cliente Novo',processo:'',instancia:'ANS',responsavel:'Bruno Lima (OAB/DF)',tipoRecurso:'',description:'Análise de portabilidade especial e ordinária conforme regulação ANS (RN 438/2018).',deadline:'',conclusaoDeadline:'',fatalDeadline:'',waitDeadline:'',priority:'baixa',createdAt:ts()},
+    ],
+    concluido:[
+      {id:i(),title:'Notificações extrajudiciais de rescisão – Nefrostar',client:'Nefrostar Brasília',processo:'',instancia:'Extrajudicial',responsavel:'Bruno Lima (OAB/DF)',tipoRecurso:'',description:'Notificações enviadas a pacientes inadimplentes.',deadline:'',conclusaoDeadline:'',fatalDeadline:'',waitDeadline:'',priority:'baixa',createdAt:ts()},
+      {id:i(),title:'Carrossel Instagram – CAR-T (Carvykti)',client:'Lopes de Lima Advogados',processo:'',instancia:'',responsavel:'Bruno Lima (OAB/DF)',tipoRecurso:'',description:'Post sobre judicialização bem-sucedida de terapia CAR-T. Publicado.',deadline:'',conclusaoDeadline:'',fatalDeadline:'',waitDeadline:'',priority:'baixa',createdAt:ts()},
+      {id:i(),title:'Termo de Guarda Provisória',client:'Confidencial',processo:'',instancia:'Extrajudicial',responsavel:'Bruno Lima (OAB/DF)',tipoRecurso:'',description:'Documento elaborado e assinado pelas partes.',deadline:'',conclusaoDeadline:'',fatalDeadline:'',waitDeadline:'',priority:'baixa',createdAt:ts()},
+    ],
+  };
+}
+
+function loadLocal(){try{const v=localStorage.getItem(KEY);return v?JSON.parse(v):seed();}catch{return seed();}}
+
+/* ── DATE ROW ── */
+function DateRow({icon,label,date,fatal}){
+  if(!date)return null;
+  const t=tod(),t3=in3();
+  const venc=date<t,urg=!venc&&date<=t3;
+  const color=fatal?'#FF6200':venc?'#C0392B':urg?'#D35400':'#777';
+  return(
+    <div className="date-row" style={{color,textShadow:fatal?'0 0 8px rgba(255,98,0,.35)':'none',fontSize:fatal?'12px':'11px'}}>
+      <span>{icon}</span><span>{label}: <strong>{date}</strong></span>
+      {venc&&<span className="vbadge">VENCIDO</span>}
+      {urg&&!venc&&<span className="ubadge">URGENTE</span>}
+    </div>
+  );
+}
+
+/* ── CARD MODAL ── */
+function CardModal({modal,setModal,cards,persist}){
+  const isAdd=modal.t==='add';
+  const col=COLS.find(c=>c.id===modal.col);
+  const isAg=modal.col==='aguardando';
+  const [f,setF]=useState(isAdd?{...BLANK}:{...BLANK,...modal.card});
+  const cf=k=>e=>setF(p=>({...p,[k]:e.target.value}));
+  const save=()=>{
+    if(!f.title.trim())return;
+    const nc={...cards};
+    if(isAdd)nc[modal.col]=[...nc[modal.col],{...f,id:mk(),createdAt:ts()}];
+    else nc[modal.col]=nc[modal.col].map(c=>c.id===modal.card.id?{...c,...f}:c);
+    persist(nc);setModal(null);
+  };
+  return(
+    <div className="overlay" onClick={e=>{if(e.target===e.currentTarget)setModal(null);}}>
+      <div className="modal">
+        <div style={{display:'flex',alignItems:'center',gap:9,marginBottom:2}}>
+          <div style={{width:11,height:11,borderRadius:'50%',background:col?.color,flexShrink:0}}></div>
+          <p className="modal-title">{isAdd?'Novo Card':'Editar Card'}</p>
+        </div>
+        <p className="modal-sub">{col?.label}</p>
+        <p className="slbl">Identificação</p>
+        <label className="lbl" style={{marginTop:0}}>Título *</label>
+        <input className="inp" value={f.title} onChange={cf('title')} placeholder="Ex: Petição inicial – Caso X"/>
+        <div className="frow">
+          <div className="fw"><label className="lbl">Cliente / Parte</label><input className="inp" value={f.client} onChange={cf('client')} placeholder="Nome do cliente"/></div>
+          <div className="fw"><label className="lbl">Nº do Processo</label><input className="inp" value={f.processo} onChange={cf('processo')} placeholder="0000000-00.0000.0.00.0000"/></div>
+        </div>
+        <div className="frow">
+          <div className="fw"><label className="lbl">Instância</label><select className="inp" value={f.instancia} onChange={cf('instancia')}>{INST.map(v=><option key={v} value={v}>{v||'— Selecione —'}</option>)}</select></div>
+          <div className="fw"><label className="lbl">Tipo de Recurso / Peça</label><select className="inp" value={f.tipoRecurso} onChange={cf('tipoRecurso')}>{TIPOS.map(v=><option key={v} value={v}>{v||'— Selecione —'}</option>)}</select></div>
+        </div>
+        <div className="frow">
+          <div className="fw"><label className="lbl">Advogado / Estagiário Responsável</label><select className="inp" value={f.responsavel} onChange={cf('responsavel')}>{RESPS.map(v=><option key={v} value={v}>{v||'— Selecione —'}</option>)}</select></div>
+          <div className="fw"><label className="lbl">Prioridade</label><select className="inp" value={f.priority} onChange={cf('priority')}>{PRI.map(p=><option key={p.v} value={p.v}>{p.lbl}</option>)}</select></div>
+        </div>
+        <hr className="sep"/><p className="slbl">Descrição</p>
+        <textarea className="inp ta" value={f.description} onChange={cf('description')} placeholder="Fundamentos, detalhes, próximos passos…" style={{marginTop:2}}/>
+        <hr className="sep"/><p className="slbl">Prazos</p>
+        <div className="frow">
+          <div className="fw"><label className="lbl">📅 Prazo</label><input className="inp" type="date" value={f.deadline} onChange={cf('deadline')}/></div>
+          <div className="fw"><label className="lbl">✅ Prazo de Conclusão</label><input className="inp" type="date" value={f.conclusaoDeadline} onChange={cf('conclusaoDeadline')}/></div>
+        </div>
+        <div className="frow">
+          <div className="fw"><label className="lbl" style={{color:'#C0392B'}}>⚡ Prazo Fatal</label><input className="inp" type="date" value={f.fatalDeadline} onChange={cf('fatalDeadline')} style={{borderColor:f.fatalDeadline?'#F1948A':''}}/></div>
+          {isAg?<div className="fw"><label className="lbl" style={{color:'#4A42A8'}}>⏳ Aguardar até</label><input className="inp" type="date" value={f.waitDeadline} onChange={cf('waitDeadline')}/></div>:<div className="fw"/>}
+        </div>
+        <div className="modal-foot">
+          <button className="btn btn-cancel" onClick={()=>setModal(null)}>Cancelar</button>
+          <button className="btn btn-save" onClick={save}>Salvar</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ── APPS SCRIPT CODE ── */
+const SCRIPT_CODE=`// ══════════════════════════════════════════════════
+// KANBAN — Lopes de Lima Advogados  (versão colaborativa)
+// Cole este código em script.google.com
+// ══════════════════════════════════════════════════
+
+const ARQUIVO = 'kanban-lopes-lima.json';
+const PASTA   = 'Kanban LLL';
+
+// ── GET: test, calendar, load, check ─────────────
+function doGet(e) {
+  const acao = e.parameter.action || '';
+  try {
+    if (acao === 'test')     return ok({ status: 'ok', msg: 'Conectado com sucesso!' });
+    if (acao === 'calendar') return ok(getAgenda());
+    if (acao === 'load')     return ok(carregar());
+    if (acao === 'check')    return ok(checar());
+    return ok({ erro: 'Acao desconhecida: ' + acao });
+  } catch(err) {
+    return ok({ erro: err.message });
+  }
+}
+
+// ── POST: save ───────────────────────────────────
+function doPost(e) {
+  try {
+    const body = JSON.parse(e.postData.contents);
+    if (body.action === 'save') return ok(salvar(body.data));
+    return ok({ erro: 'Acao desconhecida' });
+  } catch(err) {
+    return ok({ erro: err.message });
+  }
+}
+
+function ok(obj) {
+  return ContentService
+    .createTextOutput(JSON.stringify(obj))
+    .setMimeType(ContentService.MimeType.JSON);
+}
+
+// ── Google Agenda ────────────────────────────────
+function getAgenda() {
+  const agora  = new Date();
+  const futuro = new Date(agora.getTime() + 14 * 86400000);
+  const tz     = Session.getScriptTimeZone();
+  return CalendarApp.getDefaultCalendar()
+    .getEvents(agora, futuro)
+    .map(function(ev) {
+      return {
+        title:       ev.getTitle(),
+        date:        Utilities.formatDate(ev.getStartTime(), tz, 'yyyy-MM-dd'),
+        description: ev.getDescription() || ''
+      };
+    });
+}
+
+// ── Drive ────────────────────────────────────────
+function getPasta() {
+  const pastas = DriveApp.getFoldersByName(PASTA);
+  return pastas.hasNext() ? pastas.next() : DriveApp.createFolder(PASTA);
+}
+
+function salvar(dados) {
+  const pasta    = getPasta();
+  const arquivos = pasta.getFilesByName(ARQUIVO);
+  const conteudo = JSON.stringify(dados, null, 2);
+  if (arquivos.hasNext()) {
+    arquivos.next().setContent(conteudo);
+  } else {
+    pasta.createFile(ARQUIVO, conteudo, 'application/json');
+  }
+  return { ok: true, savedAt: new Date().toISOString() };
+}
+
+function carregar() {
+  const pasta    = getPasta();
+  const arquivos = pasta.getFilesByName(ARQUIVO);
+  if (!arquivos.hasNext()) return { ok: false, data: null };
+  const arquivo  = arquivos.next();
+  return {
+    ok: true,
+    data: JSON.parse(arquivo.getBlob().getDataAsString()),
+    updatedAt: arquivo.getLastUpdated().toISOString()
+  };
+}
+
+function checar() {
+  const pasta    = getPasta();
+  const arquivos = pasta.getFilesByName(ARQUIVO);
+  if (!arquivos.hasNext()) return { ok: false };
+  return { ok: true, updatedAt: arquivos.next().getLastUpdated().toISOString() };
+}`;
+
+/* ── SETTINGS MODAL ── */
+function SettingsModal({url,setUrl,onClose,syncStatus}){
+  const [v,setV]=useState(url);
+  const [tab,setTab]=useState('config');
+  const [testResult,setTestResult]=useState(null);
+  const [testing,setTesting]=useState(false);
+  const save=()=>{const t=v.trim();setUrl(t);localStorage.setItem(SCRKEY,t);onClose();};
+  const test=async()=>{
+    const u=v.trim();
+    if(!u){setTestResult({t:'err',msg:'Cole a URL do Apps Script primeiro.'});return;}
+    setTesting(true);setTestResult({t:'info',msg:'Testando conexão…'});
+    try{
+      const r=await fetch(`${u}?action=test`,{redirect:'follow'});
+      const data=JSON.parse(await r.text());
+      if(data.status==='ok')setTestResult({t:'ok',msg:'✓ '+data.msg+'\n\nConexão funcionando! Clique em Salvar URL.'});
+      else setTestResult({t:'err',msg:'Resposta inesperada:\n'+JSON.stringify(data)});
+    }catch(e){setTestResult({t:'err',msg:'Erro: '+e.message+'\n\n• URL correta?\n• "Qualquer pessoa" pode acessar?\n• Tente reimplantar o Apps Script.'});}
+    setTesting(false);
+  };
+  const copy=()=>{try{navigator.clipboard.writeText(SCRIPT_CODE);}catch{}};
+  return(
+    <div className="overlay" onClick={e=>{if(e.target===e.currentTarget)onClose();}}>
+      <div className="modal" style={{maxWidth:620}}>
+        <p className="modal-title" style={{marginBottom:8}}>Configurar Google Apps Script</p>
+        <div className="tab-bar">
+          {[['config','⚙ Configuração'],['instrucoes','📋 Passo a passo'],['script','💻 Código']].map(([id,lbl])=>(
+            <button key={id} className={`tab-btn${tab===id?' active':''}`} onClick={()=>setTab(id)}>{lbl}</button>
+          ))}
+        </div>
+        {tab==='config'&&(
+          <>
+            <div style={{background:'#E8F4FD',border:'1px solid #AED6F1',borderRadius:8,padding:11,marginBottom:12,fontSize:12,color:'#1A5276',lineHeight:1.65}}>
+              🔄 <strong>Modo colaborativo ativo</strong> — o kanban salva automaticamente 3 segundos após qualquer alteração e busca atualizações de outros usuários a cada 30 segundos.
+            </div>
+            <label className="lbl" style={{marginTop:0}}>URL do Apps Script</label>
+            <input className="inp" value={v} onChange={e=>setV(e.target.value)} placeholder="https://script.google.com/macros/s/XXXXX/exec"/>
+            <p style={{fontSize:11,color:'#888',marginTop:6}}>
+              Status atual: <strong>{syncStatus}</strong> &nbsp;·&nbsp; E-mail: <strong>bruno@lopesdelima.com</strong>
+            </p>
+            {testResult&&<div className={`test-result test-${testResult.t}`}>{testResult.msg}</div>}
+            <div className="modal-foot" style={{justifyContent:'space-between',marginTop:14}}>
+              <button className="btn btn-test" onClick={test} disabled={testing}>{testing?'Testando…':'🔌 Testar conexão'}</button>
+              <div style={{display:'flex',gap:8}}>
+                <button className="btn btn-cancel" onClick={onClose}>Fechar</button>
+                <button className="btn btn-save" onClick={save}>Salvar URL</button>
+              </div>
+            </div>
+          </>
+        )}
+        {tab==='instrucoes'&&(
+          <div style={{maxHeight:'65vh',overflowY:'auto',paddingRight:4}}>
+            <div className="setup-box" style={{marginBottom:12}}>⚠️ Se já tinha o Apps Script configurado, atualize o código com a versão da aba "Código" e reimplante. A nova versão tem suporte à colaboração.</div>
+            <div className="step"><div className="step-n">1</div><div className="step-t">Acesse <strong>script.google.com</strong> com <strong>bruno@lopesdelima.com</strong></div></div>
+            <div className="step"><div className="step-n">2</div><div className="step-t">Abra o projeto existente ou crie um novo</div></div>
+            <div className="step"><div className="step-n">3</div><div className="step-t">Vá na aba <strong>"Código"</strong> acima → clique <strong>"Copiar código"</strong> → no Apps Script: <strong>Ctrl+A → Ctrl+V → Ctrl+S</strong></div></div>
+            <div className="step"><div className="step-n">4</div><div className="step-t">Clique em <strong>"Implantar"</strong> → <strong>"Gerenciar implantações"</strong> → lápis ✏️ → <strong>"Nova versão"</strong> → <strong>"Implantar"</strong></div></div>
+            <div className="step"><div className="step-n">5</div><div className="step-t">Copie a <strong>URL do aplicativo da web</strong> (termina em <span className="chip">/exec</span>)</div></div>
+            <div className="step"><div className="step-n">6</div><div className="step-t">Cole na aba <strong>"Configuração"</strong> → <strong>"Testar conexão"</strong> → deve aparecer mensagem verde</div></div>
+            <div className="step"><div className="step-n">7</div><div className="step-t">Compartilhe o link do Netlify com quem precisar — todos verão as mesmas alterações automaticamente</div></div>
+          </div>
+        )}
+        {tab==='script'&&(
+          <div style={{maxHeight:'65vh',overflowY:'auto'}}>
+            <p style={{fontSize:12,color:'#555',marginBottom:8}}>Copie e cole no Google Apps Script (script.google.com):</p>
+            <div style={{position:'relative'}}>
+              <div className="code-block">{SCRIPT_CODE}</div>
+              <button className="copy-btn" onClick={copy}>Copiar código</button>
+            </div>
+          </div>
+        )}
+        {tab!=='config'&&<div className="modal-foot"><button className="btn btn-cancel" onClick={onClose}>Fechar</button></div>}
+      </div>
+    </div>
+  );
+}
+
+/* ── SYNC PILL ── */
+function SyncPill({state,lastSync}){
+  const map={
+    idle:{cls:'sync-idle',dot:false,label:'Google Drive'},
+    saving:{cls:'sync-saving',dot:true,label:'Salvando…'},
+    saved:{cls:'sync-ok',dot:false,label:'Salvo ✓'},
+    loading:{cls:'sync-loading',dot:true,label:'Atualizando…'},
+    updated:{cls:'sync-ok',dot:false,label:'Atualizado ✓'},
+    error:{cls:'sync-err',dot:false,label:'Erro de sync'},
+    nocfg:{cls:'sync-idle',dot:false,label:'Drive não configurado'},
+  };
+  const s=map[state]||map.idle;
+  return(
+    <div className={`sync-pill ${s.cls}`}>
+      <div className={`dot${s.dot?' dot-pulse':''}`}/>
+      <span>{s.label}</span>
+      {lastSync&&!s.dot&&<span style={{opacity:.6,fontSize:10}}>· {lastSync}</span>}
+    </div>
+  );
+}
+
+/* ── APP ── */
+function App(){
+  const [cards,setCards]=useState(loadLocal);
+  const [modal,setModal]=useState(null);
+  const [search,setSearch]=useState('');
+  const [priF,setPriF]=useState('');
+  const [respF,setRespF]=useState('');
+  const [msg,setMsg]=useState(null);
+  const [drag,setDrag]=useState(null);
+  const [over,setOver]=useState(null);
+  const [scriptUrl,setScriptUrl]=useState(()=>localStorage.getItem(SCRKEY)||'');
+  const [showCfg,setShowCfg]=useState(false);
+  const [syncState,setSyncState]=useState('nocfg');
+  const [lastSync,setLastSync]=useState('');
+
+  // Refs to avoid stale closures
+  const cardsRef=useRef(cards);
+  const scriptUrlRef=useRef(scriptUrl);
+  const saveTimerRef=useRef(null);
+  const pollTimerRef=useRef(null);
+  const lastSavedAtRef=useRef(null); // ISO string of last save timestamp
+  const isSeedRef=useRef(false); // true = first load, don't auto-save
+
+  useEffect(()=>{cardsRef.current=cards;},[cards]);
+  useEffect(()=>{scriptUrlRef.current=scriptUrl;},[scriptUrl]);
+  useEffect(()=>{setSyncState(scriptUrl?'idle':'nocfg');},[scriptUrl]);
+
+  const flash=(txt,t='ok')=>{setMsg({txt,t});setTimeout(()=>setMsg(null),5000);};
+
+  /* ── GAS CALLS ── */
+  const gasGet=useCallback(async(action)=>{
+    const r=await fetch(`${scriptUrlRef.current}?action=${action}`,{redirect:'follow'});
+    if(!r.ok)throw new Error(`HTTP ${r.status}`);
+    return JSON.parse(await r.text());
+  },[]);
+
+  const gasPost=useCallback(async(action,data)=>{
+    await fetch(scriptUrlRef.current,{
+      method:'POST',mode:'no-cors',
+      headers:{'Content-Type':'text/plain;charset=UTF-8'},
+      body:JSON.stringify({action,data}),
+      redirect:'follow'
+    });
+  },[]);
+
+  /* ── SAVE TO DRIVE ── */
+  const saveToDrive=useCallback(async(data)=>{
+    if(!scriptUrlRef.current)return;
+    setSyncState('saving');
+    try{
+      await gasPost('save',data);
+      lastSavedAtRef.current=new Date().toISOString();
+      const t=new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
+      setLastSync(t);setSyncState('saved');
+      setTimeout(()=>setSyncState('idle'),3000);
+    }catch(e){setSyncState('error');}
+  },[gasPost]);
+
+  /* ── PERSIST: save locally + schedule Drive save ── */
+  const persist=useCallback((nc,skipDrive=false)=>{
+    setCards(nc);
+    try{localStorage.setItem(KEY,JSON.stringify(nc));}catch{}
+    if(skipDrive||!scriptUrlRef.current)return;
+    // Debounce Drive save
+    clearTimeout(saveTimerRef.current);
+    saveTimerRef.current=setTimeout(()=>saveToDrive(nc),SAVE_DEBOUNCE);
+  },[saveToDrive]);
+
+  /* ── POLL: load from Drive every 30s ── */
+  const pollDrive=useCallback(async()=>{
+    if(!scriptUrlRef.current)return;
+    try{
+      const res=await gasGet('check');
+      if(!res?.ok||!res.updatedAt)return;
+      // Only load if Drive file is newer than our last save
+      const driveTime=new Date(res.updatedAt).getTime();
+      const ourTime=lastSavedAtRef.current?new Date(lastSavedAtRef.current).getTime():0;
+      if(driveTime<=ourTime)return; // we have the latest
+      // Drive is newer — load it
+      setSyncState('loading');
+      const loaded=await gasGet('load');
+      if(loaded?.ok&&loaded.data){
+        const nc=loaded.data;
+        setCards(nc);
+        try{localStorage.setItem(KEY,JSON.stringify(nc));}catch{}
+        lastSavedAtRef.current=res.updatedAt;
+        const t=new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
+        setLastSync(t);setSyncState('updated');
+        setTimeout(()=>setSyncState('idle'),3000);
+      }
+    }catch{}
+  },[gasGet]);
+
+  /* ── Initial load from Drive ── */
+  useEffect(()=>{
+    if(!scriptUrl)return;
+    (async()=>{
+      try{
+        setSyncState('loading');
+        const res=await gasGet('load');
+        if(res?.ok&&res.data){
+          setCards(res.data);
+          try{localStorage.setItem(KEY,JSON.stringify(res.data));}catch{}
+          lastSavedAtRef.current=res.updatedAt||new Date().toISOString();
+          const t=new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
+          setLastSync(t);setSyncState('updated');
+          setTimeout(()=>setSyncState('idle'),3000);
+        }else{setSyncState('idle');}
+      }catch{setSyncState('idle');}
+    })();
+  // eslint-disable-next-line
+  },[scriptUrl]);
+
+  /* ── Start polling ── */
+  useEffect(()=>{
+    if(!scriptUrl)return;
+    pollTimerRef.current=setInterval(pollDrive,POLL_INTERVAL);
+    return()=>clearInterval(pollTimerRef.current);
+  },[scriptUrl,pollDrive]);
+
+  /* ── Calendar sync ── */
+  const syncCalendar=async()=>{
+    if(!scriptUrl){setShowCfg(true);return;}
+    flash('Buscando eventos da agenda…','info');
+    try{
+      const events=await gasGet('calendar');
+      if(!Array.isArray(events))throw new Error(events?.erro||'Resposta inválida');
+      let added=0;
+      const nc={...cardsRef.current};
+      events.forEach(ev=>{
+        const dup=(nc.prazo||[]).some(c=>c.title===ev.title&&c.deadline===ev.date);
+        if(!dup&&ev.title){
+          nc.prazo=[...(nc.prazo||[]),{
+            id:'gc-'+mk(),title:ev.title,client:'Google Agenda',processo:'',instancia:'',
+            responsavel:'Bruno Lima (OAB/DF)',tipoRecurso:'',description:ev.description||'',
+            deadline:ev.date,conclusaoDeadline:'',fatalDeadline:ev.date,waitDeadline:'',
+            priority:'alta',createdAt:ts()
+          }];added++;
+        }
+      });
+      persist(nc);
+      flash(added>0?`${added} evento(s) importado(s) para Prazo / Urgente!`:`Agenda verificada — ${events.length} evento(s) encontrado(s).`);
+    }catch(e){flash('Erro: '+e.message,'err');}
+  };
+
+  const moveCard=(col,id,to)=>{
+    if(col===to)return;
+    const card=cards[col].find(c=>c.id===id);
+    if(!card)return;
+    persist({...cards,[col]:cards[col].filter(c=>c.id!==id),[to]:[...cards[to],{...card}]});
+  };
+  const delCard=()=>{persist({...cards,[modal.col]:cards[modal.col].filter(c=>c.id!==modal.card.id)});setModal(null);};
+
+  const shown=useMemo(()=>{
+    const q=search.toLowerCase();
+    const out={};
+    COLS.forEach(({id})=>{
+      out[id]=(cards[id]||[]).filter(c=>{
+        const sm=!q||[c.title,c.client,c.processo,c.responsavel].some(x=>(x||'').toLowerCase().includes(q));
+        return sm&&(!priF||c.priority===priF)&&(!respF||c.responsavel===respF);
+      });
+    });
+    return out;
+  },[cards,search,priF,respF]);
+
+  const t=tod(),t3=in3();
+  const total=Object.values(cards).reduce((s,l)=>s+l.length,0);
+  const urgentes=Object.values(cards).reduce((s,l)=>s+l.filter(c=>(c.fatalDeadline||c.deadline)&&(c.fatalDeadline||c.deadline)>=t&&(c.fatalDeadline||c.deadline)<=t3).length,0);
+  const vencidos=Object.values(cards).reduce((s,l)=>s+l.filter(c=>(c.fatalDeadline||c.deadline)&&(c.fatalDeadline||c.deadline)<t).length,0);
+  const allResps=[...new Set(Object.values(cards).flat().map(c=>c.responsavel).filter(Boolean))];
+  const dfmt=()=>new Date().toLocaleDateString('pt-BR',{weekday:'long',day:'2-digit',month:'long',year:'numeric'});
+
+  return(
+    <div>
+      {/* HEADER */}
+      <div className="hd">
+        <div>
+          <div className="hd-title">Lopes de Lima Advogados</div>
+          <div className="hd-sub">OAB/DF · Controle Interno — Kanban</div>
+        </div>
+        <div className="hd-right">
+          <span style={{color:'rgba(255,255,255,.45)',fontSize:11}}>{dfmt()}</span>
+          <SyncPill state={syncState} lastSync={lastSync}/>
+          <button className="btn-cfg" onClick={()=>setShowCfg(true)}>⚙ Google</button>
+        </div>
+      </div>
+
+      {/* COLLAB BANNER */}
+      {scriptUrl&&(
+        <div className="collab-banner">
+          <span>🔄</span>
+          <span>Modo colaborativo — salva automaticamente após cada alteração · atualiza a cada 30 segundos · compartilhe o link com sua equipe</span>
+        </div>
+      )}
+
+      {/* TOOLBAR */}
+      <div className="tb">
+        <input className="srch" value={search} onChange={e=>setSearch(e.target.value)} placeholder="Buscar por título, cliente, processo ou responsável…"/>
+        <select className="sel" value={priF} onChange={e=>setPriF(e.target.value)}>
+          <option value=''>Todas as prioridades</option>{PRI.map(p=><option key={p.v} value={p.v}>{p.lbl}</option>)}
+        </select>
+        <select className="sel" value={respF} onChange={e=>setRespF(e.target.value)}>
+          <option value=''>Todos os responsáveis</option>{allResps.map(r=><option key={r} value={r}>{r}</option>)}
+        </select>
+        <button className="btn btn-g" onClick={syncCalendar}
+          style={{padding:'8px 15px',border:'none',borderRadius:8,fontSize:12,cursor:'pointer',fontWeight:700,background:'#0F9D58',color:'#fff'}}>
+          📅 Sincronizar Agenda
+        </button>
+        {msg&&<span className={`msg msg-${msg.t}`}>{msg.txt}</span>}
+      </div>
+
+      {/* STATS */}
+      <div className="st">
+        {[[total,'Total','#185FA5'],[urgentes,'Urgentes (3 dias)','#FF6200'],[vencidos,'Vencidos','#C0392B'],
+          [(cards.aguardando||[]).length,'Aguardando Cliente','#4A42A8'],
+          [(cards.pendencias||[]).length,'Pendências','#822250'],
+          [(cards.concluido||[]).length,'Concluídos','#306010'],
+        ].map(([n,l,c])=>(
+          <div key={l} className="sp"><span style={{fontWeight:700,color:c,marginRight:4}}>{n}</span><span style={{color:'#666'}}>{l}</span></div>
+        ))}
+      </div>
+
+      {/* BOARD */}
+      <div className="board">
+        {COLS.map(col=>{
+          const list=shown[col.id]||[];
+          const isAg=col.id==='aguardando';
+          const isReu=col.id==='reunioes'||col.id==='audiencias';
+          return(
+            <div key={col.id} className="col">
+              <div className="col-head" style={{background:col.color}}>
+                <span className="col-label">{col.label}</span>
+                <span className="col-cnt">{list.length}</span>
+              </div>
+              <div className="col-body" style={{background:over===col.id?col.light:'#e8e6de'}}
+                onDragOver={e=>{e.preventDefault();setOver(col.id);}}
+                onDrop={e=>{e.preventDefault();if(drag&&drag.col!==col.id)moveCard(drag.col,drag.id,col.id);setDrag(null);setOver(null);}}
+                onDragLeave={()=>setOver(null)}>
+                {list.map(card=>{
+                  const pri=PRI.find(p=>p.v===card.priority)||PRI[1];
+                  return(
+                    <div key={card.id} className="card" draggable
+                      onDragStart={e=>{setDrag({id:card.id,col:col.id});e.dataTransfer.effectAllowed='move';}}
+                      style={{borderLeft:`3px solid ${col.color}`}}>
+                      <div className="card-header">
+                        <span className="card-title">{card.title}</span>
+                        <span className={pri.cls}>{pri.lbl}</span>
+                      </div>
+                      <div className="card-meta">
+                        {card.client&&<span className="tag">{card.client}</span>}
+                        {card.processo&&<span className="tag tag-proc">{card.processo}</span>}
+                        {card.instancia&&<span className="tag tag-inst">{card.instancia}</span>}
+                        {card.responsavel&&<span className="tag tag-resp">{card.responsavel}</span>}
+                        {card.tipoRecurso&&<span className="tag tag-tipo">{card.tipoRecurso}</span>}
+                      </div>
+                      {card.description&&<div className="card-desc">{card.description.slice(0,85)}{card.description.length>85?'…':''}</div>}
+                      <div className="card-dates">
+                        <DateRow icon="📅" label="Prazo" date={card.deadline}/>
+                        <DateRow icon="✅" label="Conclusão" date={card.conclusaoDeadline}/>
+                        <DateRow icon="⚡" label="Prazo Fatal" date={card.fatalDeadline} fatal/>
+                        {isAg&&<DateRow icon="⏳" label="Aguardar até" date={card.waitDeadline}/>}
+                        {isReu&&card.deadline&&<DateRow icon="🗓" label="Data" date={card.deadline}/>}
+                      </div>
+                      <div className="card-foot">
+                        <select className="mv-sel" onChange={e=>{if(e.target.value){moveCard(col.id,card.id,e.target.value);e.target.value='';}}} value="">
+                          <option value="" disabled>Mover para…</option>
+                          {COLS.filter(c=>c.id!==col.id).map(c=><option key={c.id} value={c.id}>{c.label}</option>)}
+                        </select>
+                        <button className="ic-btn" onClick={()=>setModal({t:'edit',col:col.id,card})}>Editar</button>
+                        <button className="ic-btn ic-del" onClick={()=>setModal({t:'confirm',col:col.id,card})}>Excluir</button>
+                      </div>
+                    </div>
+                  );
+                })}
+                <button className="add-btn" onClick={()=>setModal({t:'add',col:col.id})}>+ Adicionar card</button>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {(modal?.t==='add'||modal?.t==='edit')&&<CardModal modal={modal} setModal={setModal} cards={cards} persist={persist}/>}
+      {modal?.t==='confirm'&&(
+        <div className="overlay" onClick={e=>{if(e.target===e.currentTarget)setModal(null);}}>
+          <div className="modal" style={{maxWidth:360}}>
+            <p className="modal-title" style={{marginBottom:8}}>Excluir card?</p>
+            <p style={{fontSize:13,color:'#555',marginBottom:5}}><b>{modal.card?.title}</b></p>
+            <p style={{fontSize:13,color:'#888',marginBottom:18}}>Esta ação não poderá ser desfeita.</p>
+            <div className="modal-foot">
+              <button className="btn btn-cancel" onClick={()=>setModal(null)}>Cancelar</button>
+              <button className="btn btn-danger" onClick={delCard}>Excluir</button>
+            </div>
+          </div>
+        </div>
+      )}
+      {showCfg&&<SettingsModal url={scriptUrl} setUrl={u=>{setScriptUrl(u);localStorage.setItem(SCRKEY,u);}} onClose={()=>setShowCfg(false)} syncStatus={syncState}/>}
+    </div>
+  );
+}
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
+</body>
+</html>
