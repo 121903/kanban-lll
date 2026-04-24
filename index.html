@@ -439,13 +439,19 @@ function SyncPill({state,lastSync}){
 /* ── APP ── */
 function App(){
   const [cards,setCards]=useState(loadLocal);
+  const [colOrder,setColOrder]=useState(()=>{
+    try{const v=localStorage.getItem('kll-colorder');return v?JSON.parse(v):COLS.map(c=>c.id);}
+    catch{return COLS.map(c=>c.id);}
+  });
   const [modal,setModal]=useState(null);
   const [search,setSearch]=useState('');
   const [priF,setPriF]=useState('');
   const [respF,setRespF]=useState('');
   const [msg,setMsg]=useState(null);
+  // drag state: {type:'card'|'col', id, colId?}
   const [drag,setDrag]=useState(null);
-  const [over,setOver]=useState(null);
+  const [overCol,setOverCol]=useState(null);   // col id being hovered (col drag)
+  const [overCard,setOverCard]=useState(null); // {id,colId} card being hovered
   const [scriptUrl,setScriptUrl]=useState(()=>localStorage.getItem(SCRKEY)||'');
   const [showCfg,setShowCfg]=useState(false);
   const [syncState,setSyncState]=useState('nocfg');
@@ -581,12 +587,43 @@ function App(){
     }catch(e){flash('Erro: '+e.message,'err');}
   };
 
-  const moveCard=(col,id,to)=>{
+  const moveCardTo=(col,id,to)=>{
     if(col===to)return;
     const card=cards[col].find(c=>c.id===id);
     if(!card)return;
-    persist({...cards,[col]:cards[col].filter(c=>c.id!==id),[to]:[...cards[to],{...card}]});
+    persist({...cards,[col]:cards[col].filter(c=>c.id!==id),[to]:[...(cards[to]||[]),{...card}]});
   };
+
+  // Reorder card within same column or insert before another card
+  const dropCardOnCard=(dragColId,dragId,targetColId,targetId)=>{
+    const nc={...cards};
+    const src=nc[dragColId];
+    const card=src.find(c=>c.id===dragId);
+    if(!card)return;
+    // Remove from source
+    nc[dragColId]=src.filter(c=>c.id!==dragId);
+    // Insert before target in destination
+    const dest=[...(nc[targetColId]||[])];
+    const targetIdx=dest.findIndex(c=>c.id===targetId);
+    if(targetIdx===-1) dest.push(card);
+    else dest.splice(targetIdx,0,card);
+    nc[targetColId]=dest;
+    persist(nc);
+  };
+
+  // Reorder columns
+  const dropColOnCol=(dragId,targetId)=>{
+    if(dragId===targetId)return;
+    const arr=[...colOrder];
+    const from=arr.indexOf(dragId);
+    const to=arr.indexOf(targetId);
+    if(from===-1||to===-1)return;
+    arr.splice(from,1);
+    arr.splice(to,0,dragId);
+    setColOrder(arr);
+    try{localStorage.setItem('kll-colorder',JSON.stringify(arr));}catch{}
+  };
+
   const delCard=()=>{persist({...cards,[modal.col]:cards[modal.col].filter(c=>c.id!==modal.card.id)});setModal(null);};
 
   const shown=useMemo(()=>{
@@ -660,26 +697,78 @@ function App(){
 
       {/* BOARD */}
       <div className="board">
-        {COLS.map(col=>{
+        {colOrder.map(colId=>{
+          const col=COLS.find(c=>c.id===colId);
+          if(!col)return null;
           const list=shown[col.id]||[];
           const isAg=col.id==='aguardando';
           const isReu=col.id==='reunioes'||col.id==='audiencias';
+          const isColDragOver=drag?.type==='col'&&overCol===col.id&&drag.id!==col.id;
           return(
-            <div key={col.id} className="col">
-              <div className="col-head" style={{background:col.color}}>
-                <span className="col-label">{col.label}</span>
+            <div key={col.id} className="col"
+              style={{opacity:drag?.type==='col'&&drag.id===col.id?.8:1,
+                outline:isColDragOver?`2px dashed ${col.color}`:'none',
+                outlineOffset:'2px',transition:'opacity .15s'}}
+              draggable
+              onDragStart={e=>{
+                // only drag col if target is the header
+                if(!e.target.closest('.col-head'))return;
+                setDrag({type:'col',id:col.id});
+                e.dataTransfer.effectAllowed='move';
+              }}
+              onDragOver={e=>{
+                e.preventDefault();
+                if(drag?.type==='col'){setOverCol(col.id);}
+                else if(drag?.type==='card'){setOverCol(col.id);}
+              }}
+              onDrop={e=>{
+                e.preventDefault();
+                if(drag?.type==='col'){
+                  dropColOnCol(drag.id,col.id);
+                }else if(drag?.type==='card'&&drag.colId!==col.id){
+                  // drop on empty area of col → append
+                  moveCardTo(drag.colId,drag.id,col.id);
+                }
+                setDrag(null);setOverCol(null);setOverCard(null);
+              }}
+              onDragLeave={e=>{if(!e.currentTarget.contains(e.relatedTarget)){setOverCol(null);}}}
+            >
+              <div className="col-head" style={{background:col.color,cursor:'grab'}}>
+                <span className="col-label">⠿ {col.label}</span>
                 <span className="col-cnt">{list.length}</span>
               </div>
-              <div className="col-body" style={{background:over===col.id?col.light:'#e8e6de'}}
-                onDragOver={e=>{e.preventDefault();setOver(col.id);}}
-                onDrop={e=>{e.preventDefault();if(drag&&drag.col!==col.id)moveCard(drag.col,drag.id,col.id);setDrag(null);setOver(null);}}
-                onDragLeave={()=>setOver(null)}>
-                {list.map(card=>{
+              <div className="col-body" style={{background:overCol===col.id&&drag?.type==='card'?col.light:'#e8e6de'}}>
+                {list.map((card,cardIdx)=>{
                   const pri=PRI.find(p=>p.v===card.priority)||PRI[1];
+                  const isCardOver=overCard?.id===card.id&&overCard?.colId===col.id&&drag?.id!==card.id;
                   return(
                     <div key={card.id} className="card" draggable
-                      onDragStart={e=>{setDrag({id:card.id,col:col.id});e.dataTransfer.effectAllowed='move';}}
-                      style={{borderLeft:`3px solid ${col.color}`}}>
+                      style={{
+                        borderLeft:`3px solid ${col.color}`,
+                        opacity:drag?.type==='card'&&drag.id===card.id?.4:1,
+                        borderTop:isCardOver?`2px solid ${col.color}`:'',
+                        marginTop:isCardOver?0:'',
+                        transition:'opacity .15s,border .1s'
+                      }}
+                      onDragStart={e=>{
+                        e.stopPropagation();
+                        setDrag({type:'card',id:card.id,colId:col.id});
+                        e.dataTransfer.effectAllowed='move';
+                      }}
+                      onDragOver={e=>{
+                        e.preventDefault();e.stopPropagation();
+                        setOverCard({id:card.id,colId:col.id});
+                        setOverCol(null);
+                      }}
+                      onDrop={e=>{
+                        e.preventDefault();e.stopPropagation();
+                        if(drag?.type==='card'){
+                          dropCardOnCard(drag.colId,drag.id,col.id,card.id);
+                        }
+                        setDrag(null);setOverCard(null);setOverCol(null);
+                      }}
+                      onDragLeave={e=>{if(!e.currentTarget.contains(e.relatedTarget))setOverCard(null);}}
+                    >
                       <div className="card-header">
                         <span className="card-title">{card.title}</span>
                         <span className={pri.cls}>{pri.lbl}</span>
@@ -700,9 +789,9 @@ function App(){
                         {isReu&&card.deadline&&<DateRow icon="🗓" label="Data" date={card.deadline}/>}
                       </div>
                       <div className="card-foot">
-                        <select className="mv-sel" onChange={e=>{if(e.target.value){moveCard(col.id,card.id,e.target.value);e.target.value='';}}} value="">
+                        <select className="mv-sel" onChange={e=>{if(e.target.value){moveCardTo(col.id,card.id,e.target.value);e.target.value='';}}} value="">
                           <option value="" disabled>Mover para…</option>
-                          {COLS.filter(c=>c.id!==col.id).map(c=><option key={c.id} value={c.id}>{c.label}</option>)}
+                          {colOrder.map(cid=>{const cc=COLS.find(x=>x.id===cid);return cc&&cc.id!==col.id?<option key={cc.id} value={cc.id}>{cc.label}</option>:null;})}
                         </select>
                         <button className="ic-btn" onClick={()=>setModal({t:'edit',col:col.id,card})}>Editar</button>
                         <button className="ic-btn ic-del" onClick={()=>setModal({t:'confirm',col:col.id,card})}>Excluir</button>
